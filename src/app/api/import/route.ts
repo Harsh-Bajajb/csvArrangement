@@ -88,46 +88,64 @@ RETURN FORMAT:
 
   const prompt = `Batch to process:\n${JSON.stringify(batch, null, 2)}`;
 
-  const result = await model.generateContent({
-    contents: [
-      { role: 'user', parts: [{ text: prompt }] }
-    ],
-    systemInstruction,
-    generationConfig: {
-      responseMimeType: "application/json",
-    }
-  });
+  const maxRetries = 3;
+  const backoffDelays = [1000, 2000, 4000];
 
-  const responseText = result.response.text();
-  
-  try {
-    const parsed = JSON.parse(responseText);
-    const rawImported = Array.isArray(parsed.imported) ? parsed.imported : [];
-    const skipped = Array.isArray(parsed.skipped) ? parsed.skipped : [];
-    
-    const validatedImported: any[] = [];
-    
-    for (const record of rawImported) {
-      const validation = crmRecordSchema.safeParse(record);
-      if (validation.success) {
-        validatedImported.push(record);
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const result = await model.generateContent({
+        contents: [
+          { role: 'user', parts: [{ text: prompt }] }
+        ],
+        systemInstruction,
+        generationConfig: {
+          responseMimeType: "application/json",
+        }
+      });
+
+      const responseText = result.response.text();
+      
+      const parsed = JSON.parse(responseText);
+      const rawImported = Array.isArray(parsed.imported) ? parsed.imported : [];
+      const skipped = Array.isArray(parsed.skipped) ? parsed.skipped : [];
+      
+      const validatedImported: any[] = [];
+      
+      for (const record of rawImported) {
+        const validation = crmRecordSchema.safeParse(record);
+        if (validation.success) {
+          validatedImported.push(record);
+        } else {
+          console.error("AI validation failed for record:", record, "Errors:", validation.error.format());
+          skipped.push({
+            ...record,
+            reason: "invalid AI output"
+          });
+        }
+      }
+
+      return {
+        imported: validatedImported,
+        skipped: skipped
+      };
+    } catch (error) {
+      console.error(`Gemini API call failed on attempt ${attempt + 1}:`, error);
+      if (attempt < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, backoffDelays[attempt]));
       } else {
-        console.error("AI validation failed for record:", record, "Errors:", validation.error.format());
-        skipped.push({
-          ...record,
-          reason: "invalid AI output"
-        });
+        // Final attempt failed
+        return {
+          imported: [],
+          skipped: batch.map(row => ({
+            ...row,
+            reason: "processing failed after retries"
+          }))
+        };
       }
     }
-
-    return {
-      imported: validatedImported,
-      skipped: skipped
-    };
-  } catch (error) {
-    console.error("Failed to parse Gemini response:", responseText);
-    throw new Error("Invalid JSON response from AI model.");
   }
+
+  return { imported: [], skipped: [] }; // Fallback
 }
 
 export async function POST(request: Request) {
