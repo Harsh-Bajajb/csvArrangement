@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useRef } from 'react';
 import Papa from 'papaparse';
-import { UploadCloud, AlertCircle, FileSpreadsheet, X } from 'lucide-react';
+import { UploadCloud, AlertCircle, FileSpreadsheet, X, Loader2, ArrowRight, CheckCircle2 } from 'lucide-react';
 
 interface CsvData {
   headers: string[];
@@ -10,16 +10,24 @@ interface CsvData {
 }
 
 export default function CsvUploader() {
+  // Parsing states
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [csvData, setCsvData] = useState<CsvData | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   
+  // Import states
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<any>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const processFile = (file: File) => {
     setError(null);
     setCsvData(null);
+    setImportResult(null);
+    setImportError(null);
     
     if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
       setError('Please upload a valid .csv file.');
@@ -47,6 +55,7 @@ export default function CsvUploader() {
         const headers = Object.keys(results.data[0] as any);
         setCsvData({
           headers,
+          // We save all rows in state. (If this gets very large, we might need a different strategy, but fine for now).
           rows: results.data
         });
       },
@@ -75,8 +84,41 @@ export default function CsvUploader() {
     setCsvData(null);
     setFileName(null);
     setError(null);
+    setImportResult(null);
+    setImportError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!csvData || csvData.rows.length === 0) return;
+    
+    setIsImporting(true);
+    setImportError(null);
+    setImportResult(null);
+    
+    try {
+      const response = await fetch('/api/import', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(csvData.rows),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('Import successful:', result);
+      setImportResult(result);
+    } catch (err: any) {
+      console.error('Import failed:', err);
+      setImportError(err.message || 'An unexpected error occurred during import.');
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -117,11 +159,33 @@ export default function CsvUploader() {
         </div>
       )}
 
-      {/* Error Message */}
+      {/* Parse Error Message */}
       {error && (
         <div className="flex items-center gap-3 p-4 text-red-700 bg-red-50 border border-red-200 rounded-lg opacity-100 transition-opacity duration-300">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
           <p className="text-sm font-medium">{error}</p>
+        </div>
+      )}
+
+      {/* Import Error Message */}
+      {importError && (
+        <div className="flex items-center gap-3 p-4 text-red-700 bg-red-50 border border-red-200 rounded-lg opacity-100 transition-opacity duration-300">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <div className="text-sm">
+            <p className="font-medium">Import failed</p>
+            <p className="text-red-600 mt-0.5">{importError}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Import Success Message */}
+      {importResult && (
+        <div className="flex items-center gap-3 p-4 text-green-700 bg-green-50 border border-green-200 rounded-lg opacity-100 transition-opacity duration-300">
+          <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+          <div className="text-sm">
+            <p className="font-medium">Import completed successfully!</p>
+            <p className="text-green-600 mt-0.5">Results have been logged to the console.</p>
+          </div>
         </div>
       )}
 
@@ -138,13 +202,35 @@ export default function CsvUploader() {
                 <p className="text-xs text-slate-500">Previewing first {csvData.rows.length} rows</p>
               </div>
             </div>
-            <button 
-              onClick={resetUpload}
-              className="px-4 py-2 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm font-medium w-full sm:w-auto"
-            >
-              <X className="w-4 h-4" />
-              Clear Selection
-            </button>
+            
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row items-center gap-2">
+              <button 
+                onClick={resetUpload}
+                disabled={isImporting}
+                className="px-4 py-2 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm font-medium w-full sm:w-auto disabled:opacity-50"
+              >
+                <X className="w-4 h-4" />
+                Clear
+              </button>
+              <button 
+                onClick={handleConfirmImport}
+                disabled={isImporting || csvData.rows.length === 0}
+                className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all flex items-center justify-center gap-2 text-sm font-medium w-full sm:w-auto shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {isImporting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <ArrowRight className="w-4 h-4" />
+                    Confirm Import
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
