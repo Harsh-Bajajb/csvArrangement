@@ -93,11 +93,11 @@ Returns an object containing arrays of `imported` (successfully mapped to the ex
 - **Data Persistence:** The results are currently kept in React state. A real-world application would pipe the `imported` results directly into a CRM (e.g., Salesforce, HubSpot) via webhooks or an API integration.
 
 ## Deployment
-[DEPLOYED_URL_HERE]
+[https://csvarrangement.onrender.com/](https://csvarrangement.onrender.com/)
 
 ## Screenshots
-![Upload State Placeholder]()
+![Upload State](./public/screenshot1.png)
 
-![Preview State Placeholder]()
+![Preview State](./public/screenshot2.png)
 
-![Results State Placeholder]()
+![Results State](./public/screenshot3.png)
