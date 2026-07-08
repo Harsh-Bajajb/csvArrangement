@@ -1,5 +1,8 @@
 # GrowEasy CSV Importer
 
+> [!IMPORTANT]
+> **Note on Performance / API Latency:** 
+> Because this application runs synchronously to map extensive 15-field CRM schemas per row, requests are bottlenecked entirely by the token-generation speed of the Google Gemini API. When running on a free-tier API key, generating the required JSON output tokens can take **~15-25 seconds** even for small files (6-12 rows). This is standard AI inference latency and is not reflective of application processing overhead (which executes in ~130ms). For production speeds, a paid unthrottled API tier or a refactor to React Server Streams is recommended.
 ## Project Overview
 GrowEasy CSV Importer is a robust, AI-powered tool designed to streamline the ingestion of messy lead data into a standardized CRM format. The application allows users to upload raw CSV files, instantly preview the data, and seamlessly map arbitrary columns to a strict CRM schema using Google's Gemini AI.
 

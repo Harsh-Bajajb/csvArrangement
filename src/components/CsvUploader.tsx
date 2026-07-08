@@ -114,7 +114,7 @@ export default function CsvUploader() {
       }
 
       const result = await response.json();
-      console.log('Import successful:', result);
+      console.log('Import successful.');
       setImportResult(result);
     } catch (err: any) {
       console.error('Import failed:', err);

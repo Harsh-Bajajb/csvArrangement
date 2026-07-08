@@ -66,8 +66,8 @@ describe('POST /api/import', () => {
   });
 
   it('batching function correctly splits N rows into expected batch sizes', async () => {
-    // Generate 45 rows
-    const rows = Array.from({ length: 45 }).map((_, i) => ({ id: i }));
+    // Generate 125 rows to test 50-sized batches (50, 50, 25)
+    const rows = Array.from({ length: 125 }).map((_, i) => ({ id: i }));
     const req = createRequest(rows);
 
     // Mock AI to just return empty arrays so it passes
@@ -83,15 +83,15 @@ describe('POST /api/import', () => {
     expect(res.status).toBe(200);
     expect(mockGenerateContent).toHaveBeenCalledTimes(3);
     
-    // Verify batch sizes passed to Gemini (20, 20, 5)
+    // Verify batch sizes passed to Gemini (50, 50, 25)
     const call1Content = JSON.parse(mockGenerateContent.mock.calls[0][0].contents[0].parts[0].text.replace('Batch to process:\n', ''));
-    expect(call1Content.length).toBe(20);
+    expect(call1Content.length).toBe(50);
     
     const call2Content = JSON.parse(mockGenerateContent.mock.calls[1][0].contents[0].parts[0].text.replace('Batch to process:\n', ''));
-    expect(call2Content.length).toBe(20);
+    expect(call2Content.length).toBe(50);
 
     const call3Content = JSON.parse(mockGenerateContent.mock.calls[2][0].contents[0].parts[0].text.replace('Batch to process:\n', ''));
-    expect(call3Content.length).toBe(5);
+    expect(call3Content.length).toBe(25);
   });
 
   it('skip logic: a row with no email and no mobile is excluded from imported and added to skipped', async () => {
@@ -118,7 +118,7 @@ describe('POST /api/import', () => {
   });
 
   it('response merging: multiple batch results are correctly combined', async () => {
-    const rows = Array.from({ length: 25 }).map((_, i) => ({ id: i }));
+    const rows = Array.from({ length: 75 }).map((_, i) => ({ id: i }));
     const req = createRequest(rows);
 
     // First batch (20 rows) returns 10 imported, 5 skipped

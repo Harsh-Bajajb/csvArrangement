@@ -6,7 +6,7 @@ import { z } from 'zod';
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 // Configurable batch size
-const BATCH_SIZE = 20;
+const BATCH_SIZE = 50;
 
 const crmRecordSchema = z.object({
   created_at: z.string().refine((val) => !isNaN(Date.parse(val)), {
@@ -86,7 +86,7 @@ RETURN FORMAT:
   ]
 }`;
 
-  const prompt = `Batch to process:\n${JSON.stringify(batch, null, 2)}`;
+  const prompt = `Batch to process:\n${JSON.stringify(batch)}`;
 
   const maxRetries = 3;
   const backoffDelays = [1000, 2000, 4000];
@@ -105,7 +105,10 @@ RETURN FORMAT:
 
       const responseText = result.response.text();
       
-      const parsed = JSON.parse(responseText);
+      // Clean potential markdown backticks that cause JSON.parse to fail and trigger the retry loop
+      const cleanText = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+      
+      const parsed = JSON.parse(cleanText);
       const rawImported = Array.isArray(parsed.imported) ? parsed.imported : [];
       const skipped = Array.isArray(parsed.skipped) ? parsed.skipped : [];
       
@@ -116,7 +119,7 @@ RETURN FORMAT:
         if (validation.success) {
           validatedImported.push(record);
         } else {
-          console.error("AI validation failed for record:", record, "Errors:", validation.error.format());
+          console.error("AI validation failed for a record (details redacted). Errors:", validation.error.format());
           skipped.push({
             ...record,
             reason: "invalid AI output"
@@ -178,27 +181,27 @@ export async function POST(request: Request) {
       batches.push(rows.slice(i, i + BATCH_SIZE));
     }
 
-    // 3. Process batches sequentially
-    // (Sequential is usually safer to avoid hitting AI rate limits compared to Promise.all)
-    for (let i = 0; i < batches.length; i++) {
-      const batch = batches[i];
+    // 3. Process batches concurrently for speed
+    const batchPromises = batches.map(async (batch, i) => {
       try {
-        const result = await processWithAI(batch);
-        
-        // Ensure the stub function returned arrays, then push them
-        if (Array.isArray(result.imported)) finalImported.push(...result.imported);
-        if (Array.isArray(result.skipped)) finalSkipped.push(...result.skipped);
-        
+        return await processWithAI(batch);
       } catch (batchError: any) {
         console.error(`Error processing batch ${i}:`, batchError);
-        
-        // If a whole batch fails, mark all rows in it as skipped with the failure reason
-        const skippedBatch = batch.map(row => ({
-          ...row,
-          reason: `Batch processing failed: ${batchError.message || 'Unknown error'}`
-        }));
-        finalSkipped.push(...skippedBatch);
+        return {
+          imported: [],
+          skipped: batch.map(row => ({
+            ...row,
+            reason: `Batch processing failed: ${batchError.message || 'Unknown error'}`
+          }))
+        };
       }
+    });
+
+    const results = await Promise.all(batchPromises);
+
+    for (const result of results) {
+      if (Array.isArray(result.imported)) finalImported.push(...result.imported);
+      if (Array.isArray(result.skipped)) finalSkipped.push(...result.skipped);
     }
 
     // 4. Merge results and respond
