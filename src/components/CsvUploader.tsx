@@ -135,34 +135,41 @@ export default function CsvUploader() {
       {/* Upload Zone */}
       {!csvData && (
         <div 
-          className={`relative border-2 border-dashed rounded-xl p-12 transition-all duration-200 ease-in-out flex flex-col items-center justify-center text-center cursor-pointer overflow-hidden group ${
+          className={`relative rounded-2xl p-12 transition-all duration-300 ease-in-out flex flex-col items-center justify-center text-center cursor-pointer overflow-hidden group shadow-sm hover:shadow-md ${
             isDragging 
-              ? 'border-blue-500 bg-blue-50/50' 
+              ? 'border-2 border-dashed border-blue-500 bg-blue-50/50 scale-[1.01]' 
               : error 
-                ? 'border-red-300 bg-red-50/30 hover:border-red-400 hover:bg-red-50/50' 
-                : 'border-slate-300 hover:border-blue-400 hover:bg-slate-50'
+                ? 'border-2 border-dashed border-red-300 bg-red-50/30 hover:border-red-400 hover:bg-red-50/50' 
+                : 'border-2 border-dashed border-slate-300 bg-white/80 backdrop-blur-sm hover:border-blue-400 hover:bg-slate-50'
           }`}
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
           onDragLeave={() => setIsDragging(false)}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
         >
+          <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-white/0 pointer-events-none" />
+          
           <input 
             type="file"
             accept=".csv"
             className="hidden"
             ref={fileInputRef}
             onChange={handleChange}
+            data-testid="csv-input"
           />
           
-          <div className={`p-4 rounded-full mb-4 transition-colors ${isDragging ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500 group-hover:bg-blue-50 group-hover:text-blue-500'}`}>
-            <UploadCloud className="w-8 h-8" />
+          <div className={`relative p-4 rounded-full mb-5 transition-all duration-300 shadow-sm ${
+            isDragging 
+              ? 'bg-blue-600 text-white scale-110' 
+              : 'bg-white text-blue-500 group-hover:bg-blue-50 border border-slate-100 group-hover:scale-110'
+          }`}>
+            <UploadCloud className="w-10 h-10" />
           </div>
-          <h3 className="text-xl font-semibold text-slate-800 mb-2">
-            {isDragging ? 'Drop your CSV here' : 'Drag & drop a CSV file'}
+          <h3 className="text-xl font-bold text-slate-800 mb-2 tracking-tight">
+            {isDragging ? 'Drop your CSV right here' : 'Drag & drop your CSV file'}
           </h3>
-          <p className="text-slate-500 text-sm max-w-xs">
-            Or click to browse from your computer. Only .csv files are supported.
+          <p className="text-slate-500 text-sm max-w-sm">
+            Or click to browse from your computer. We accept any valid <span className="font-medium text-slate-700">.csv</span> file.
           </p>
         </div>
       )}
