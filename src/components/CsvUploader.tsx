@@ -2,7 +2,9 @@
 
 import React, { useState, useCallback, useRef } from 'react';
 import Papa from 'papaparse';
-import { UploadCloud, AlertCircle, FileSpreadsheet, X, Loader2, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { UploadCloud, AlertCircle, FileSpreadsheet, X, Loader2, ArrowRight } from 'lucide-react';
+import DataTable from './DataTable';
+import ImportResult from './ImportResult';
 
 interface CsvData {
   headers: string[];
@@ -55,7 +57,7 @@ export default function CsvUploader() {
         const headers = Object.keys(results.data[0] as any);
         setCsvData({
           headers,
-          // We save all rows in state. (If this gets very large, we might need a different strategy, but fine for now).
+          // We save all rows in state.
           rows: results.data
         });
       },
@@ -122,6 +124,12 @@ export default function CsvUploader() {
     }
   };
 
+  // If import succeeded, render the Result View
+  if (importResult) {
+    return <ImportResult result={importResult} onReset={resetUpload} />;
+  }
+
+  // Otherwise, render the Upload / Preview View
   return (
     <div className="w-full max-w-5xl mx-auto p-4 space-y-6">
       {/* Upload Zone */}
@@ -178,33 +186,16 @@ export default function CsvUploader() {
         </div>
       )}
 
-      {/* Import Success Message */}
-      {importResult && (
-        <div className="flex items-center gap-3 p-4 text-green-700 bg-green-50 border border-green-200 rounded-lg opacity-100 transition-opacity duration-300">
-          <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-          <div className="text-sm">
-            <p className="font-medium">Import completed successfully!</p>
-            <p className="text-green-600 mt-0.5">Results have been logged to the console.</p>
-          </div>
-        </div>
-      )}
-
       {/* Data Preview */}
       {csvData && (
-        <div className="space-y-4 opacity-100 transition-opacity duration-500">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-white p-4 rounded-xl shadow-sm border border-slate-200 gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 text-green-600 rounded-lg">
-                <FileSpreadsheet className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-slate-800 truncate max-w-[200px] sm:max-w-xs">{fileName}</h3>
-                <p className="text-xs text-slate-500">Previewing first {csvData.rows.length} rows</p>
-              </div>
-            </div>
-            
-            {/* Actions */}
-            <div className="flex flex-col sm:flex-row items-center gap-2">
+        <DataTable 
+          title={fileName || 'Uploaded CSV'}
+          subtitle={`Previewing first ${csvData.rows.length} rows`}
+          icon={<FileSpreadsheet className="w-5 h-5" />}
+          headers={csvData.headers}
+          rows={csvData.rows}
+          actions={
+            <>
               <button 
                 onClick={resetUpload}
                 disabled={isImporting}
@@ -230,44 +221,9 @@ export default function CsvUploader() {
                   </>
                 )}
               </button>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="overflow-x-auto overflow-y-auto max-h-[600px] w-full relative">
-              <table className="w-full text-sm text-left border-collapse">
-                <thead className="text-xs text-slate-600 uppercase bg-slate-50 sticky top-0 z-10 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-                  <tr>
-                    <th className="px-6 py-4 font-semibold border-b border-r border-slate-200 bg-slate-50/95 backdrop-blur-sm sticky left-0 z-20 w-12 text-center text-slate-400">#</th>
-                    {csvData.headers.map((header, i) => (
-                      <th key={i} className="px-6 py-4 font-semibold border-b border-slate-200 whitespace-nowrap bg-slate-50/95 backdrop-blur-sm">
-                        {header}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {csvData.rows.map((row, rowIndex) => (
-                    <tr key={rowIndex} className="hover:bg-slate-50/80 transition-colors group">
-                      <td className="px-6 py-3 border-r border-slate-100 whitespace-nowrap text-slate-400 font-mono text-xs text-center bg-white group-hover:bg-slate-50/80 transition-colors sticky left-0 z-10 shadow-[1px_0_0_0_#f1f5f9]">
-                        {rowIndex + 1}
-                      </td>
-                      {csvData.headers.map((header, colIndex) => (
-                        <td key={colIndex} className="px-6 py-3 whitespace-nowrap text-slate-700">
-                          {row[header] !== undefined && row[header] !== null && String(row[header]).trim() !== ''
-                            ? String(row[header]).length > 50 
-                              ? String(row[header]).substring(0, 50) + '...' 
-                              : String(row[header])
-                            : <span className="text-slate-300 italic">null</span>}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        />
       )}
     </div>
   );
